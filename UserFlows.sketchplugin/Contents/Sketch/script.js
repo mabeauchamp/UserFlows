@@ -19,7 +19,9 @@ var defineLink = function(context) {
 
 	var selection = context.selection;
 	var validSelection = true;
-	var dest, linkLayer;
+	var dest, linkLayer, reversal;
+
+	reversal = context.reverse;
 
 	if (selection.count() != 2) {
 		validSelection = false;
@@ -33,8 +35,8 @@ var defineLink = function(context) {
 			linkLayer = selection.firstObject();
 		}
 		else {
-			dest = selection.firstObject();
-			linkLayer = selection.lastObject();
+			dest = context.reverse ? selection.lastObject() : selection.firstObject();
+			linkLayer = context.reverse ? selection.firstObject() : selection.lastObject();
 		}
 
 		if (!dest || linkLayer.className() == "MSArtboardGroup" || linkLayer.parentArtboard() == dest) {
@@ -57,7 +59,6 @@ var defineLink = function(context) {
 	} else {
 		doc.showMessage("Link defined: " + linkLayer.name() + " → " + dest.name());
 	}
-
 }
 
 var removeLink = function(context) {
@@ -70,9 +71,12 @@ var removeLink = function(context) {
 
 	var loop = context.selection.objectEnumerator(),
 		linkLayer, destinationID;
+
 	while (linkLayer = loop.nextObject()) {
 		destinationID = context.command.valueForKey_onLayer_forPluginIdentifier("destinationID", linkLayer, kPluginDomain);
+
 		if (!destinationID) { continue; }
+
 		context.command.setValue_forKey_onLayer_forPluginIdentifier(nil, "destinationID", linkLayer, kPluginDomain);
 	}
 
@@ -83,6 +87,16 @@ var removeLink = function(context) {
 		var plural = context.selection.count() == 1 ? "Link" : "Links";
 		doc.showMessage(plural + " removed.");
 	}
+}
+
+var reverseLink = function(context) {
+	var currentSelection = context.selection;
+	
+	removeLink(context);
+	
+	context.reverse = true;
+	
+	defineLink(context);
 }
 
 var editArtboardDescription = function(context) {
@@ -290,9 +304,7 @@ var addCondition = function(context) {
 			redrawConnections(context);
 		}
 	}
-
 }
-
 
 var gotoDestination = function(context) {
 	
@@ -731,7 +743,6 @@ var generateFlow = function(context) {
 }
 
 var updateFlow = function(context) {
-
 }
 
 var hideConnections = function(context) {
@@ -1136,7 +1147,6 @@ var checkForUpdates = function(context) {
 			var websiteURL = NSURL.URLWithString(json.valueForKey("websiteURL"));
 			NSWorkspace.sharedWorkspace().openURL(websiteURL);
 		}
-	
 }
 
 var showAlert = function(message, info, primaryButtonText, secondaryButtonText) {
