@@ -19,31 +19,35 @@ var defineLink = function(context) {
 
 	var selection = context.selection;
 	var validSelection = true;
-	var destArtboard, linkLayer;
+	var dest, linkLayer;
 
 	if (selection.count() != 2) {
 		validSelection = false;
 	} else {
 		if (selection.firstObject().className() == "MSArtboardGroup") {
-			destArtboard = selection.firstObject();
+			dest = selection.firstObject();
 			linkLayer = selection.lastObject();
 		}
 		else if(selection.lastObject().className() == "MSArtboardGroup") {
-			destArtboard = selection.lastObject();
+			dest = selection.lastObject();
 			linkLayer = selection.firstObject();
 		}
+		else {
+			dest = selection.firstObject();
+			linkLayer = selection.lastObject();
+		}
 
-		if (!destArtboard || linkLayer.className() == "MSArtboardGroup" || linkLayer.parentArtboard() == destArtboard) {
+		if (!dest || linkLayer.className() == "MSArtboardGroup" || linkLayer.parentArtboard() == dest) {
 			validSelection = false;
 		}
 	}
 
 	if (!validSelection) {
-		showAlert("Invalid selection", "Select a layer or group to define as a Link, select the destination artboard, then run this command again.");
+		showAlert("Invalid selection", "Select a layer or group to define as a Link, select the destination artboard or layer, then run this command again.");
 		return;
 	}
 	
-	context.command.setValue_forKey_onLayer_forPluginIdentifier(destArtboard.objectID(), "destinationArtboardID", linkLayer, kPluginDomain);
+	context.command.setValue_forKey_onLayer_forPluginIdentifier(dest.objectID(), "destinationID", linkLayer, kPluginDomain);
 
 	var doc = context.document;
 	var showingConnections = NSUserDefaults.standardUserDefaults().objectForKey(kShowConnectionsKey) || 1;
@@ -51,7 +55,7 @@ var defineLink = function(context) {
 	if (showingConnections == 1) {
 		redrawConnections(context);
 	} else {
-		doc.showMessage("Link defined: " + linkLayer.name() + " → " + destArtboard.name());
+		doc.showMessage("Link defined: " + linkLayer.name() + " → " + dest.name());
 	}
 
 }
@@ -65,11 +69,11 @@ var removeLink = function(context) {
 	}
 
 	var loop = context.selection.objectEnumerator(),
-		linkLayer, destinationArtboardID;
+		linkLayer, destinationID;
 	while (linkLayer = loop.nextObject()) {
-		destinationArtboardID = context.command.valueForKey_onLayer_forPluginIdentifier("destinationArtboardID", linkLayer, kPluginDomain);
-		if (!destinationArtboardID) { continue; }
-		context.command.setValue_forKey_onLayer_forPluginIdentifier(nil, "destinationArtboardID", linkLayer, kPluginDomain);
+		destinationID = context.command.valueForKey_onLayer_forPluginIdentifier("destinationID", linkLayer, kPluginDomain);
+		if (!destinationID) { continue; }
+		context.command.setValue_forKey_onLayer_forPluginIdentifier(nil, "destinationID", linkLayer, kPluginDomain);
 	}
 
 	var showingConnections = NSUserDefaults.standardUserDefaults().objectForKey(kShowConnectionsKey) || 1;
@@ -151,7 +155,7 @@ var addCondition = function(context) {
 				settingsWindow.addAccessoryView(conditionView);
 				conditionFields.push(conditionField);
 				conditionChecks.push(checkbox);
-				conditionLink = context.command.valueForKey_onLayer_forPluginIdentifier("destinationArtboardID", conditionLayer.parentGroup(), kPluginDomain) || 0;
+				conditionLink = context.command.valueForKey_onLayer_forPluginIdentifier("destinationID", conditionLayer.parentGroup(), kPluginDomain) || 0;
 				conditionLinks.push(conditionLink);
 			}
 		}
@@ -159,7 +163,7 @@ var addCondition = function(context) {
 		predicate = NSPredicate.predicateWithFormat("userInfo != nil && function(userInfo, 'valueForKeyPath:', %@).isElse != nil", kPluginDomain);
 		var elseLabel = currentArtboard.children().filteredArrayUsingPredicate(predicate).firstObject();
 		if (elseLabel) {
-			elseLink = context.command.valueForKey_onLayer_forPluginIdentifier("destinationArtboardID", elseLabel.parentGroup(), kPluginDomain) || 0;
+			elseLink = context.command.valueForKey_onLayer_forPluginIdentifier("destinationID", elseLabel.parentGroup(), kPluginDomain) || 0;
 		}
 	}
 
@@ -269,7 +273,7 @@ var addCondition = function(context) {
 
 			conditionLink = conditionLinks[i];
 			if (conditionLink != 0) {
-				context.command.setValue_forKey_onLayer_forPluginIdentifier(conditionLink, "destinationArtboardID", conditionGroup, kPluginDomain);
+				context.command.setValue_forKey_onLayer_forPluginIdentifier(conditionLink, "destinationID", conditionGroup, kPluginDomain);
 			}
 
 		}
@@ -290,18 +294,18 @@ var addCondition = function(context) {
 }
 
 
-var gotoDestinationArtboard = function(context) {
+var gotoDestination = function(context) {
 	
 	parseContext(context);
 
 	var linkLayer = context.selection.firstObject(),
 		validSelection = true,
-		destinationArtboardID;
+		destinationID;
 	if (!linkLayer) {
 		validSelection = false;
 	} else {
-		destinationArtboardID = context.command.valueForKey_onLayer_forPluginIdentifier("destinationArtboardID", linkLayer, kPluginDomain);
-		if (!destinationArtboardID) {
+		destinationID = context.command.valueForKey_onLayer_forPluginIdentifier("destinationID", linkLayer, kPluginDomain);
+		if (!destinationID) {
 			validSelection = false;
 		}
 	}
@@ -312,8 +316,8 @@ var gotoDestinationArtboard = function(context) {
 	}
 
 	var doc = context.document,
-		destinationArtboard = doc.currentPage().artboards().filteredArrayUsingPredicate(NSPredicate.predicateWithFormat("objectID == %@", destinationArtboardID)).firstObject();
-	if (destinationArtboard) {
+		destination = doc.currentPage().artboards().filteredArrayUsingPredicate(NSPredicate.predicateWithFormat("objectID == %@", destinationID)).firstObject();
+	if (destination) {
 		var cRect = doc.currentView().visibleContentRect(),
 			contentRect = {
 				x : cRect.origin.x,
@@ -331,8 +335,30 @@ var gotoDestinationArtboard = function(context) {
 
 		context.command.setValue_forKey_onDocument_forPluginIdentifier(rects, "contentRectsHistory", doc.documentData(), kPluginDomain);
 
-		doc.currentView().centerRect(destinationArtboard.absoluteRect().rect());
-		destinationArtboard.select_byExpandingSelection(true, false);
+		doc.currentView().centerRect(destination.absoluteRect().rect());
+		destination.select_byExpandingSelection(true, false);
+	}else{
+		destination = doc.currentPage().children().filteredArrayUsingPredicate(NSPredicate.predicateWithFormat("objectID == %@", destinationID)).firstObject()
+
+		var cRect = doc.currentView().visibleContentRect(),
+			contentRect = {
+				x : cRect.origin.x,
+				y : cRect.origin.y,
+				width : cRect.size.width,
+				height : cRect.size.height,
+				linkLayerID : linkLayer.objectID()
+			},
+			rects = context.command.valueForKey_onDocument_forPluginIdentifier("contentRectsHistory", doc.documentData(), kPluginDomain);
+
+		if (!rects) { 
+			rects = NSArray.array();
+		}
+		rects = rects.arrayByAddingObject(contentRect);
+
+		context.command.setValue_forKey_onDocument_forPluginIdentifier(rects, "contentRectsHistory", doc.documentData(), kPluginDomain);
+
+		doc.currentView().centerRect(destination.absoluteRect().rect());
+		destination.select_byExpandingSelection(true, false);
 	}
 }
 
@@ -374,7 +400,7 @@ var generateFlow = function(context) {
 
 	settingsWindow.addTextLabelWithValue("Start from:");
 
-	linkLayerPredicate = NSPredicate.predicateWithFormat("userInfo != nil && function(userInfo, 'valueForKeyPath:', %@).destinationArtboardID != nil", kPluginDomain);
+	linkLayerPredicate = NSPredicate.predicateWithFormat("userInfo != nil && function(userInfo, 'valueForKeyPath:', %@).destinationID != nil", kPluginDomain);
 	var linkLayers = doc.currentPage().children().filteredArrayUsingPredicate(linkLayerPredicate);
 
 	if (linkLayers.count() == 0) {
@@ -460,7 +486,7 @@ var generateFlow = function(context) {
 			artboardsToExport = [initialArtboard],
 			screenShadowColor = MSImmutableColor.colorWithSVGString("#00000").newMutableCounterpart(),
 			tempFolderURL = NSFileManager.defaultManager().URLsForDirectory_inDomains(NSCachesDirectory, NSUserDomainMask).lastObject().URLByAppendingPathComponent(kPluginDomain),
-			artboard, artboardID, linkLayers, linkLayersCount, destinationArtboard, destinationArtboardID, linkLayer, screenLayer, exportRequest, exportURL, screenShadow, connection, artboardNameLabel, primaryTextColor, secondaryTextColor, flowBackgroundColor, artboardIsConditional, isCondition, destinationArtboardIsConditional;
+			artboard, artboardID, linkLayers, linkLayersCount, destination, destinationID, linkLayer, screenLayer, exportRequest, exportURL, screenShadow, connection, artboardNameLabel, primaryTextColor, secondaryTextColor, flowBackgroundColor, artboardIsConditional, isCondition, destinationIsConditional;
 
 		context.command.setValue_forKey_onLayer_forPluginIdentifier(initialArtboard.objectID(), "homeScreenID", doc.currentPage(), kPluginDomain);
 		screenShadowColor.setAlpha(.2);
@@ -539,25 +565,25 @@ var generateFlow = function(context) {
 			linkLayersCount = linkLayers.count();
 			for (var i=0; i < linkLayersCount; i++) {
 			  linkLayer = linkLayers.objectAtIndex(i);
-			  destinationArtboardID = context.command.valueForKey_onLayer_forPluginIdentifier("destinationArtboardID", linkLayer, kPluginDomain);
+			  destinationID = context.command.valueForKey_onLayer_forPluginIdentifier("destinationID", linkLayer, kPluginDomain);
 			  
 			  isCondition = context.command.valueForKey_onLayer_forPluginIdentifier("isConditionGroup", linkLayer, kPluginDomain) || 0;
 
-			  destinationArtboard = doc.currentPage().artboards().filteredArrayUsingPredicate(NSPredicate.predicateWithFormat("objectID == %@", destinationArtboardID)).firstObject();
-			  destinationArtboardIsConditional = context.command.valueForKey_onLayer_forPluginIdentifier(kConditionalArtboardKey, destinationArtboard, kPluginDomain) || 0;
-			  if (destinationArtboard) {
+			  destination = doc.currentPage().artboards().filteredArrayUsingPredicate(NSPredicate.predicateWithFormat("objectID == %@", destinationID)).firstObject();
+			  destinationIsConditional = context.command.valueForKey_onLayer_forPluginIdentifier(kConditionalArtboardKey, destination, kPluginDomain) || 0;
+			  if (destination) {
 
 			  	connection = {
 			  		linkRect : linkLayer.absoluteRect().rect(),
 			  		linkIsCondition : isCondition,
-			  		destinationIsConditional : destinationArtboardIsConditional,
+			  		destinationIsConditional : destinationIsConditional,
 			  		dropPoint : {
-			  			x : destinationArtboard.absoluteRect().x() - (10*exportScale),
-			  			y : destinationArtboard.absoluteRect().y() - (10*exportScale)
+			  			x : destination.absoluteRect().x() - (10*exportScale),
+			  			y : destination.absoluteRect().y() - (10*exportScale)
 			  		}
 			  	}
 			  	connections.push(connection);
-				artboardsToExport.push(destinationArtboard);
+				artboardsToExport.push(destination);
 			  	
 			  }
 			}
@@ -729,6 +755,7 @@ var showConnections = function(context) {
 }
 
 var redrawConnections = function(context) {
+
 	var doc = context.document || context.actionContext.document;
 	var selectedLayers = doc.findSelectedLayers();
 	var connectionsGroup = getConnectionsGroupInPage(doc.currentPage());
@@ -737,31 +764,33 @@ var redrawConnections = function(context) {
 		connectionsGroup.removeFromParent();
 	}
 
-	var linkLayersPredicate = NSPredicate.predicateWithFormat("userInfo != nil && function(userInfo, 'valueForKeyPath:', %@).destinationArtboardID != nil", kPluginDomain),
+	var linkLayersPredicate = NSPredicate.predicateWithFormat("userInfo != nil && function(userInfo, 'valueForKeyPath:', %@).destinationID != nil", kPluginDomain),
 		linkLayers = doc.currentPage().children().filteredArrayUsingPredicate(linkLayersPredicate),
 		loop = linkLayers.objectEnumerator(),
 		connections = [],
-		linkLayer, destinationArtboardID, destinationArtboard, isCondition;
+		linkLayer, destinationID, destination, isCondition;
 
 	while (linkLayer = loop.nextObject()) {
 
-		destinationArtboardID = context.command.valueForKey_onLayer_forPluginIdentifier("destinationArtboardID", linkLayer, kPluginDomain);
+		destinationID = context.command.valueForKey_onLayer_forPluginIdentifier("destinationID", linkLayer, kPluginDomain);
 
 		isCondition = context.command.valueForKey_onLayer_forPluginIdentifier("isConditionGroup", linkLayer, kPluginDomain) || 0;
 		  
-		destinationArtboard = doc.currentPage().artboards().filteredArrayUsingPredicate(NSPredicate.predicateWithFormat("objectID == %@", destinationArtboardID)).firstObject();
-		if (destinationArtboard) {
-
-			connection = {
-		  		linkRect : linkLayer.absoluteRect().rect(),
-		  		linkIsCondition : isCondition,
-		  		dropPoint : {
-		  			x : destinationArtboard.absoluteRect().x() - 10,
-		  			y : destinationArtboard.absoluteRect().y()
-		  		}
-		  	}
-		  	connections.push(connection);
+		destination = doc.currentPage().artboards().filteredArrayUsingPredicate(NSPredicate.predicateWithFormat("objectID == %@", destinationID)).firstObject();
+		
+		if (!destination) {
+			destination = doc.currentPage().children().filteredArrayUsingPredicate(NSPredicate.predicateWithFormat("objectID == %@", destinationID)).firstObject()
 		}
+
+		connection = {
+			linkRect : linkLayer.absoluteRect().rect(),
+			linkIsCondition : isCondition,
+			dropPoint : {
+				x : destination.absoluteRect().x() - 10,
+				y : destination.absoluteRect().y()
+			}
+		}
+		connections.push(connection);
 	}
 
 	var connectionLayers = MSLayerArray.arrayWithLayers(drawConnections(connections, doc.currentPage(), 1));
@@ -788,13 +817,13 @@ var drawConnections = function(connections, parent, exportScale) {
 		hitAreaBorderColor = MSImmutableColor.colorWithSVGString(flowIndicatorColor).newMutableCounterpart(),
 		arrowRotation = 0,
 		arrowOffsetX = 0,
-		path, hitAreaLayer, linkRect, dropPoint, hitAreaBorder, startPoint, controlPoint1, controlPoint1Offset, controlPoint2OffsetX, controlPoint2OffsetY, linePath, lineLayer, destinationArtboardIsConditional;
+		path, hitAreaLayer, linkRect, dropPoint, hitAreaBorder, startPoint, controlPoint1, controlPoint1Offset, controlPoint2OffsetX, controlPoint2OffsetY, linePath, lineLayer, destinationIsConditional;
 	hitAreaColor.setAlpha(0);
 
 	for (var i=0; i < connectionsCount; i++) {
 		connection = connections[i];
 		linkRect = connection.linkRect;
-		destinationArtboardIsConditional = connection.destinationIsConditional == 1;
+		destinationIsConditional = connection.destinationIsConditional == 1;
 		if (linkRect.size.width < minimumTapArea) {
 			linkRect = NSInsetRect(linkRect, (linkRect.size.width-minimumTapArea)/2, 0);
 		}
@@ -814,7 +843,7 @@ var drawConnections = function(connections, parent, exportScale) {
 			connectionLayers.push(hitAreaLayer);
 		}
 
-		dropPoint = destinationArtboardIsConditional ? NSMakePoint(connection.dropPoint.x+(5*exportScale), connection.dropPoint.y + (10*exportScale)) : NSMakePoint(connection.dropPoint.x, connection.dropPoint.y);
+		dropPoint = destinationIsConditional ? NSMakePoint(connection.dropPoint.x+(5*exportScale), connection.dropPoint.y + (10*exportScale)) : NSMakePoint(connection.dropPoint.x, connection.dropPoint.y);
 		if (dropPoint.x < CGRectGetMinX(linkRect)) {
 			dropPoint = NSMakePoint(dropPoint.x + 18, dropPoint.y - (30/exportScale) );
 			arrowRotation = 90;
@@ -1172,5 +1201,5 @@ var logEvent = function(event, props) {
 		base64 = json.base64EncodedStringWithOptions(0),
 		url = NSURL.URLWithString(NSString.stringWithFormat("https://api.mixpanel.com/track/?data=%@&ip=1", base64));
 
-	if (url) NSURLSession.sharedSession().dataTaskWithURL(url).resume();
+	//if (url) NSURLSession.sharedSession().dataTaskWithURL(url).resume();
 }
