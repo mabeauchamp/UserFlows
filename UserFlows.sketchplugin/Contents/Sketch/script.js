@@ -19,13 +19,26 @@ var defineLink = function(context) {
 
 	var selection = context.selection;
 	var validSelection = true;
-	var dest, linkLayer, reversal;
+	var dest, linkLayer, reversing, alreadyReversed;
 
-	reversal = context.reverse;
+
+	reversing = context.reverse != nil ? context.reverse :false;
+		
+	if(context.command.valueForKey_onLayer_forPluginIdentifier("reversed-"+selection.lastObject().objectID(), selection.firstObject(), kPluginDomain) == 1
+		|| context.command.valueForKey_onLayer_forPluginIdentifier("reversed-"+selection.firstObject().objectID(), selection.lastObject(), kPluginDomain) == 1){
+		
+		alreadyReversed = true;
+	}
 
 	if (selection.count() != 2) {
 		validSelection = false;
 	} else {
+
+		if(alreadyReversed && !reversing){
+			return;
+			reversing = false
+		}
+
 		if (selection.firstObject().className() == "MSArtboardGroup") {
 			dest = selection.firstObject();
 			linkLayer = selection.lastObject();
@@ -35,13 +48,19 @@ var defineLink = function(context) {
 			linkLayer = selection.firstObject();
 		}
 		else {
-			dest = context.reverse ? selection.lastObject() : selection.firstObject();
-			linkLayer = context.reverse ? selection.firstObject() : selection.lastObject();
+			if(alreadyReversed){
+				reversing = false;
+			}
+
+			dest = reversing ? selection.lastObject() : selection.firstObject();
+			linkLayer = reversing ? selection.firstObject() : selection.lastObject();
 		}
 
 		if (!dest || linkLayer.className() == "MSArtboardGroup" || linkLayer.parentArtboard() == dest) {
 			validSelection = false;
 		}
+
+
 	}
 
 	if (!validSelection) {
@@ -49,7 +68,16 @@ var defineLink = function(context) {
 		return;
 	}
 	
+
 	context.command.setValue_forKey_onLayer_forPluginIdentifier(dest.objectID(), "destinationID", linkLayer, kPluginDomain);
+
+	if(!reversing){
+		context.command.setValue_forKey_onLayer_forPluginIdentifier(reversing, "reversed-"+dest.objectID(), linkLayer, kPluginDomain);
+		context.command.setValue_forKey_onLayer_forPluginIdentifier(reversing, "reversed-"+linkLayer.objectID(), dest, kPluginDomain);
+	}
+	else{
+		context.command.setValue_forKey_onLayer_forPluginIdentifier(reversing, "reversed-"+dest.objectID(), linkLayer, kPluginDomain);		
+	}
 
 	var doc = context.document;
 	var showingConnections = NSUserDefaults.standardUserDefaults().objectForKey(kShowConnectionsKey) || 1;
@@ -70,14 +98,21 @@ var removeLink = function(context) {
 	}
 
 	var loop = context.selection.objectEnumerator(),
-		linkLayer, destinationID;
+		linkLayer, destinationID, destLayer;
 
 	while (linkLayer = loop.nextObject()) {
 		destinationID = context.command.valueForKey_onLayer_forPluginIdentifier("destinationID", linkLayer, kPluginDomain);
 
 		if (!destinationID) { continue; }
 
+		destLayer = doc.currentPage().children().filteredArrayUsingPredicate(NSPredicate.predicateWithFormat("objectID == %@", destinationID)).firstObject()
+
 		context.command.setValue_forKey_onLayer_forPluginIdentifier(nil, "destinationID", linkLayer, kPluginDomain);
+
+		if(context.reverse == nil){
+			context.command.setValue_forKey_onLayer_forPluginIdentifier(nil, "reversed-"+destinationID, linkLayer, kPluginDomain);
+			context.command.setValue_forKey_onLayer_forPluginIdentifier(nil, "reversed-"+linkLayer.objectID(), destLayer, kPluginDomain);
+		}
 	}
 
 	var showingConnections = NSUserDefaults.standardUserDefaults().objectForKey(kShowConnectionsKey) || 1;
@@ -92,9 +127,9 @@ var removeLink = function(context) {
 var reverseLink = function(context) {
 	var currentSelection = context.selection;
 	
-	removeLink(context);
-	
 	context.reverse = true;
+	
+	removeLink(context);
 	
 	defineLink(context);
 }
