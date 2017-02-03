@@ -25,6 +25,16 @@
     },
     {
       "script" : "script.js",
+      "shortcut" : "cmd shift i",
+      "handlers" : {
+        "run" : "reverseLink"
+      },
+      "identifier" : "reverseLink",
+      "description" : "Reverse a Link.",
+      "icon" : "icon.png",
+      "name" : "Reverse Link"
+    },
+    {
       "shortcut" : "",
       "name" : "Relink Duplicated Artboards",
       "identifier" : "relinkArtboardsAfterCopy",
@@ -172,6 +182,8 @@
     "items" : [
       "defineLink",
       "removeLink",
+      "reverseLink",
+      "addCondition",
       "relinkArtboardsAfterCopy",
       "-",
       "addCondition",
