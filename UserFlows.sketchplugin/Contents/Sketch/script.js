@@ -59,8 +59,6 @@ var defineLink = function(context) {
 		if (!dest || linkLayer.className() == "MSArtboardGroup" || linkLayer.parentArtboard() == dest) {
 			validSelection = false;
 		}
-
-
 	}
 
 	if (!validSelection) {
